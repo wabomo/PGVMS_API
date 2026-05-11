@@ -1,0 +1,28 @@
+# 1. 重载系统服务配置
+sudo systemctl daemon-reload
+
+# 2. 立即启动
+sudo systemctl start pgvms.service
+
+# 3. 设置开机自启
+sudo systemctl enable pgvms.service
+
+
+
+🛠️ 常用维护命令 (Root 用户)
+由于你是 root 启动，查看日志和状态时通常不需要加 sudo（虽然加了也没错）。
+表格
+功能	命令	说明
+看状态		systemctl status pgvms.service	检查是否 "Active: active (running)"
+看实时日志	journalctl -u pgvms.service -f	最常用，查看程序打印的日志和报错
+重启服务	systemctl restart pgvms.service	修改代码后使用
+停止服务	systemctl stop pgvms.service	暂停服务
+
+
+
+systemctl daemon-reload
+systemctl restart pgvms.service
+
+systemctl status pgvms.service
+
+journalctl -u pgvms.service -f

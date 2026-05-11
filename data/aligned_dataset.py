@@ -22,7 +22,7 @@ class AlignedDataset(BaseDataset):
     '/path/to/data/testA' and '/path/to/data/testB' during test time.
     """
 
-    def __init__(self, opt):
+    def __init__(self, opt, one_pair_fp=None):
         """Initialize this dataset class.
 
         Parameters:
@@ -37,9 +37,13 @@ class AlignedDataset(BaseDataset):
             self.dir_A = os.path.join(opt.dataroot, "valA")
             self.dir_B = os.path.join(opt.dataroot, "valB")
            
-
-        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
-        self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
+        if one_pair_fp:
+            fps = sorted(one_pair_fp)
+            self.A_paths = [fps[0]]
+            self.B_paths = [fps[1]]
+        else:
+            self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
+            self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
 
 
         self.A_size = len(self.A_paths)  # get the size of dataset A
@@ -72,13 +76,12 @@ class AlignedDataset(BaseDataset):
         modified_opt = util.copyconf(self.opt, load_size=self.opt.crop_size if is_finetuning else self.opt.load_size)
         transform_A = get_transform(modified_opt,colorjitter=True)
         transform_B = get_transform(modified_opt)
-        transform_mask = transforms.Compose([
-        transforms.ToTensor(),  # 将图像转换为张量
-        transforms.RandomCrop(self.opt.crop_size),
-        transforms.RandomHorizontalFlip(p=0.5)
-            # 随机裁剪图像到指定尺寸
-        # transforms.Resize(output_size),  # 缩放图像到指定尺寸
-    ])
+        # transform_mask = transforms.Compose([
+        #     transforms.ToTensor(),  # 将图像转换为张量
+        #     transforms.RandomCrop(self.opt.crop_size) # 随机裁剪图像到指定尺寸
+        #     # transforms.RandomHorizontalFlip(p=0.5) # 以 50% 的概率，随机把图片 水平左右翻转（镜像）            
+        #     # transforms.Resize(output_size),  # 缩放图像到指定尺寸
+        # ])
         # FDL: synchronize transforms
         seed = np.random.randint(2147483647) # make a seed with numpy generator 
         random.seed(seed) # apply this seed to img tranfsorms

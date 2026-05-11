@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PGVMS Virtual Staining</title>
+  <meta name="description" content="PGVMS H&E to virtual IHC staining demo website." />
+  <style>
+    :root {
+      --bg: #f7f2ea;
+      --card: rgba(255,255,255,.84);
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --primary: #8b1e3f;
+      --primary2: #be123c;
+      --soft: #fff7ed;
+      --green: #047857;
+      --red: #991b1b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, #fff7ed 0, transparent 34rem),
+        radial-gradient(circle at bottom right, #ffe4e6 0, transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .nav {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), #f97316);
+      box-shadow: 0 12px 24px rgba(139,30,63,.22);
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 650;
+      font-size: 14px;
+      margin-left: 22px;
+    }
+
+    .hero {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 24px 26px;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid #fecdd3;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 18px 0 18px;
+      font-size: clamp(42px, 6vw, 78px);
+      line-height: .98;
+      letter-spacing: -0.07em;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.75;
+    }
+
+    .hero-card {
+      background: var(--card);
+      border: 1px solid rgba(229,231,235,.9);
+      border-radius: 32px;
+      padding: 22px;
+      box-shadow: 0 24px 70px rgba(17,24,39,.10);
+      backdrop-filter: blur(12px);
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .mini {
+      min-height: 120px;
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, rgba(139,30,63,.13), rgba(249,115,22,.10)),
+        #fff;
+      border: 1px solid var(--line);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .mini b {
+      font-size: 28px;
+      letter-spacing: -0.04em;
+    }
+
+    .mini span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 24px 70px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(229,231,235,.9);
+      border-radius: 30px;
+      box-shadow: 0 20px 55px rgba(17,24,39,.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .controls {
+      padding: 24px;
+      position: sticky;
+      top: 20px;
+    }
+
+    .section-title {
+      margin: 0 0 16px;
+      font-size: 20px;
+      letter-spacing: -0.035em;
+    }
+
+    label {
+      display: block;
+      margin: 18px 0 9px;
+      font-size: 14px;
+      font-weight: 850;
+    }
+
+    input[type="file"], select, input[type="text"], input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 16px;
+      padding: 13px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input[type="file"]:focus, select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: #f9a8d4;
+      box-shadow: 0 0 0 4px rgba(249,168,212,.22);
+    }
+
+    .box-note {
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, var(--soft));
+      border-radius: 22px;
+      padding: 18px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .size-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    button {
+      border: 0;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: white;
+      border-radius: 18px;
+      padding: 15px 18px;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 16px 34px rgba(139,30,63,.25);
+      transition: transform .15s ease, opacity .15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .65; cursor: wait; transform: none; }
+
+    .secondary {
+      background: #fff;
+      color: var(--primary);
+      border: 1px solid #fecdd3;
+      box-shadow: none;
+    }
+
+    .hint {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .viewer {
+      padding: 18px;
+    }
+
+    .image-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .image-box {
+      background: #fafafa;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      min-height: 390px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .image-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 900;
+    }
+
+    .image-head span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .preview {
+      flex: 1;
+      min-height: 340px;
+      padding: 14px;
+      display: grid;
+      place-items: center;
+      color: #9ca3af;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .preview img {
+      max-width: 100%;
+      max-height: 640px;
+      object-fit: contain;
+      border-radius: 16px;
+    }
+
+    .status {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #92400e;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .status.show { display: block; }
+    .status.ok { background: #ecfdf5; border-color: #a7f3d0; color: var(--green); }
+    .status.err { background: #fef2f2; border-color: #fecaca; color: var(--red);
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 28px;
+      max-width: 860px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+      padding: 24px 28px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .modal-close {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: #f3f4f6;
+      border-radius: 12px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      box-shadow: none;
+      padding: 0;
+    }
+
+    .modal-close:hover {
+      background: #e5e7eb;
+      transform: none;
+    }
+
+    .modal-content {
+      padding: 24px 28px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 14px;
+      padding: 13px 16px;
+      font-size: 15px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: #f9a8d4;
+      box-shadow: 0 0 0 4px rgba(249,168,212,.22);
+    }
+
+    .form-group textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .form-group .required {
+      color: #be123c;
+      margin-left: 4px;
+    }
+
+    .form-error {
+      display: none;
+      color: #be123c;
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .form-error.show {
+      display: block;
+    }
+
+    .modal-submit {
+      width: 100%;
+      border: 0;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: white;
+      border-radius: 16px;
+      padding: 15px 18px;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 16px 34px rgba(139,30,63,.25);
+      margin-top: 12px;
+    }
+
+    .modal-submit:hover {
+      transform: translateY(-1px);
+    }
+
+    .modal-submit:disabled {
+      opacity: .65;
+      cursor: wait;
+      transform: none;
+    }
+
+    .terms-content {
+      padding: 0;
+    }
+
+    .terms-box {
+      max-height: 50vh;
+      overflow-y: auto;
+      padding: 24px 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .terms-box p {
+      margin: 0 0 16px;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .terms-box p:last-child {
+      margin-bottom: 0;
+    }
+
+    .terms-agree {
+      padding: 20px 28px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-top: 2px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .terms-agree + .modal-submit {
+      margin: 0 28px 24px;
+      width: calc(100% - 56px);
+    }
+
+    .demo-images {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .demo-item {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .demo-item img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+
+    .demo-item .demo-info {
+      padding: 14px;
+      background: #fafafa;
+    }
+
+    .demo-item .demo-info b {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .demo-item .demo-info span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .info {
+      margin-top: 18px;
+      display: grid;
+      /* grid-template-columns: repeat(3, 1fr);*/
+      gap: 12px;
+    }
+
+    .info-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 20px;
+      padding: 14px;
+    }
+
+    .info-card b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .info-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .footer {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px 38px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .controls { position: static; }
+      .image-grid { grid-template-columns: 1fr; }
+      .info { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>PGVMS Demo</div>
+    </div>
+    <div>
+      <a href="#demo">Demo</a>
+      <a href="http://www.qin-mixlab.cn" target="_blank">Mixlab</a>
+      <a href="https://github.com/ccitachi/PGVMS" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <div class="tag">Prompt-Guided Virtual Multiplex IHC Staining</div>
+      <h1>H&E to Virtual IHC Staining</h1>
+      <p class="lead">
+        Upload an H&E pathological image, select the target staining domain, and invoke the backend PGVMS model to generate virtual IHC results. It is recommended to use a 20× magnification image;
+        <!--        
+        上传一张 H&E 病理图像，选择目标染色域，调用后端 PGVMS 模型生成虚拟 IHC 结果。
+        建议使用 20× magnification 图像；页面支持自动读取输入图像尺寸，也支持你手动修改推理尺寸。
+        -->
+      </p>
+    </div>
+
+    <div class="hero-card">
+      <div class="mini-grid">
+        <div class="mini">
+          <b>H&E</b>
+          <span>Input pathology image</span>
+        </div>
+        <div class="mini">
+          <b>IHC</b>
+          <span>PR / Ki67 / HER2 / ER</span>
+        </div>
+        <div class="mini">
+          <b>PGVMS</b>
+          <span>Generator backend ready</span>
+        </div>
+        <div class="mini">
+          <b>Size</b>
+          <span>Auto-detected and editable</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="main" id="demo">
+    <div class="workspace">
+      <section class="panel controls">
+        <h2 class="section-title">Run virtual staining</h2>
+        <block style="display: none;">          
+        <label for="api">Backend API</label>
+        <input id="api" type="text" value="/api/infer" />
+        </block>
+
+        <label for="file">1. Upload H&E image</label>
+        <input id="file" type="file" accept="image/*" />
+
+        <label for="stain">2. Target stain</label>
+        <select id="stain">
+          <option value="PR">PR</option>
+          <option value="Ki67">Ki67</option>
+          <option value="HER2">HER2</option>
+          <option value="ER">ER</option>
+        </select>
+
+        <label>3. Inference size</label>
+        <div class="size-row">
+          <div>
+            <input id="targetWidth" type="number" min="1" step="1" placeholder="Width" />
+          </div>
+          <div>
+            <input id="targetHeight" type="number" min="1" step="1" placeholder="Height" />
+          </div>
+        </div>
+        <!--
+        <div class="box-note">
+          It is recommended to upload H&E images at 20× magnification. 
+          建议上传 <b>20× magnification</b> 的 H&E 图像。上传后会自动读取原始宽高，你也可以手动修改后再发给后端。
+        </div>
+        -->
+
+        <div class="button-row">
+          <button id="run">Generate virtual IHC</button>
+          <button class="secondary" id="demoBtn">Use demo preview</button>
+        </div>
+
+      </section>
+
+      <section class="panel viewer">
+        <div class="image-grid">
+          <div class="image-box">
+            <div class="image-head">Input H&E <span id="inputMeta">waiting</span></div>
+            <div class="preview" id="inputPreview">Upload an H&E image to preview.</div>
+          </div>
+
+          <div class="image-box">
+            <div class="image-head">Virtual IHC <span id="outputMeta">PGVMS</span></div>
+            <div class="preview" id="outputPreview">Generated result will appear here.</div>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+      </section>
+    </div>
+    
+      <section>
+
+        <div class="info" id="about">
+          <div class="info-card">
+            <b>Paper</b>
+            <span>
+            <p>
+              <b>Title: </b>
+              PGVMS: A Prompt-Guided Unified Framework for Virtual Multiplex IHC Staining with Pathological Semantic Learning (TMI 2026)
+              <br><br><b>Abstract: </b>
+              PGVMS is a prompt-guided framework for virtual multiplex IHC staining. Using only uniplex IHC training data, PGVMS digitally transforms H&E images into multiple IHC staining results. It leverages a pathological vision-language model for adaptive semantic guidance, and introduces protein-aware and prototype-consistent learning strategies to improve staining distribution consistency and pathological reliability.
+              <br><br><b>Authors: </b>
+              Fuqiang Chen, Ranran Zhang, Wanming Hu, Deboch Eyob Abera, Yue Peng, Boyun Zheng, Yiwen Sun, Jing Cai, Wenjian Qin           
+              <br><br><b>Institution: </b>
+              Shenzhen Institutes of Advanced Technology，Chinese Academy of Sciences
+            </p>
+            <p>
+            <b>Cite as:	</b><a href="https://arxiv.org/abs/2602.23292" target="_blank">arXiv:2602.23292</a> [cs.CV]<br>
+ 	(or <a href="https://arxiv.org/abs/2602.23292v1" target="_blank">arXiv:2602.23292v1</a> [cs.CV] for this version)<br>
+ 
+        <a href="https://arxiv.org/abs/2602.23292" target="_blank">https://doi.org/10.48550/arXiv.2602.23292</a>
+</p></span>
+          </div>
+        </div>
+
+      </section>
+  </main>
+
+  <footer class="footer">
+      This tool is made available for non-commercial academic purposes only.<br>
+      Please use the GitHub Issues tab for discussion and questions.
+    </footer>
+
+    <div class="modal-overlay" id="demoModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">PGVMS Virtual Staining Demo</h3>
+          <button class="modal-close" id="modalClose">×</button>
+        </div>
+        <div class="modal-content" style="padding: 0;">
+          <iframe src="demo_show.html" style="width: 100%; height: 70vh; border: none;"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="termsModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">PGVMS Terms of Use</h3>
+        </div>
+        <div class="modal-content terms-content">
+          <div class="terms-box">
+            <p><strong>PLEASE READ THIS DOCUMENT CAREFULLY BEFORE YOU ACCESS OR USE PGVMS. BY ACCESSING ANY PORTION OF PGVMS, YOU AGREE TO BE BOUND BY THE TERMS AND CONDITIONS SET FORTH BELOW. IF YOU DO NOT WISH TO BE BOUND BY THESE TERMS AND CONDITIONS, PLEASE DO NOT ACCESS PGVMS.</strong></p>
+            <p><strong>1. Disclaimer</strong></p>  
+            <!-- 免责声明 -->
+            <!-- <p>本网站，包括发布的代码、模型、演示结果和示例数据，仅供学术研究和教育使用。生成的结果不用于临床诊断、治疗决策或商业医疗用途。用户应自行承担使用本工具的风险和责任。</p> -->
+            <p>This website, including the released code, models, demo results, and example data, is provided for academic research and educational purposes only. The generated results are not intended for clinical diagnosis, treatment decisions, or commercial medical use.Users shall bear the risk and responsibility of using this tool themselves.</p>
+            
+            <p><strong>2. Usage Restrictions</strong></p>
+            <!-- 使用限制 -->
+            <!-- <p>用户不得使用本工具进行任何违法活动或伤害他人的行为。用户在使用本工具时应遵守当地法律法规。</p> -->
+            <p>Users must not use this tool for any illegal activities or actions that harm others. Users shall comply with local laws and regulations when using this tool.</p>
+
+            <p><strong>3. Intellectual Property</strong></p>
+            <!-- 知识产权 -->
+            <!-- <p>本项目中使用的所有数据集、预训练模型和第三方资源均归其原作者或提供者所有。用户应遵守相应的许可协议和使用协议。我们不保证所发布模型在所有条件下的准确性、稳健性或临床适用性。</p> -->
+            <p>All datasets, pretrained models, and third-party resources used in this project remain the property of their original authors or providers. Users should follow the corresponding licenses and usage agreements. We do not guarantee the accuracy, robustness, or clinical applicability of the released models under all conditions.</p> 
+            <!-- <p>如果您使用我们的代码、模型、数据或结果，请引用我们的论文以及下面列出的相关开源作品。</p> -->
+            <p>If you use our code, models, data, or results, please cite our paper and the related open-source works listed below.</p>
+            
+            <p><strong>4. Privacy Protection</strong></p>
+            <!-- 隐私保护 -->
+            <!-- <p>用户上传的图像仅用于模型推理，我们不会存储您的原始图像数据。但我们会记录使用统计信息以改进服务。</p> -->
+            <p>Images uploaded by users are only used for model inference. We do not store your original image data. However, we may record usage statistics to improve the service.</p>
+
+            <p><strong>5. Service Changes</strong></p>
+            <!-- 服务变更 -->
+            <!-- <p>我们保留随时修改或停止服务的权利，恕不另行通知。</p> -->
+            <p>We reserve the right to modify or discontinue the service at any time without prior notice.</p>
+          </div>
+          <div class="terms-agree">
+            <label class="checkbox-label">
+              <input type="checkbox" id="termsAgree">
+              <!-- <span>我已阅读并同意上述使用条款</span> -->
+              <span>I have read and agree to the above Terms of Use</span>
+            </label>
+          </div>
+          <button type="button" class="modal-submit" id="termsAgreeBtn" disabled>Accept Terms</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="userModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">User Information</h3>
+          <button class="modal-close" id="userModalClose">×</button>
+        </div>
+        <div class="modal-content">
+          <form id="userForm">
+            <div class="form-group">
+              <label>Name<span class="required">*</span></label>
+              <input type="text" id="userName" placeholder="Please enter your name">
+              <div class="form-error" id="nameError">Name is required</div>
+            </div>
+            <div class="form-group">
+              <label>Organization<span class="required">*</span></label>
+              <input type="text" id="userOrg" placeholder="Please enter your organization">
+              <div class="form-error" id="orgError">Organization is required</div>
+            </div>
+            <div class="form-group">
+              <label>Email<span class="required">*</span></label>
+              <input type="email" id="userEmail" placeholder="Please enter your email">
+              <div class="form-error" id="emailError">Please enter a valid email</div>
+            </div>
+            <div class="form-group">
+              <label>Purpose of Use<span class="required">*</span></label>
+              <textarea id="userPurpose" placeholder="Please describe the purpose of using this service"></textarea>
+              <div class="form-error" id="purposeError">Purpose is required</div>
+            </div>
+            <button type="submit" class="modal-submit">Submit</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <script>
+    const fileInput = document.getElementById("file");
+    const stainInput = document.getElementById("stain");
+    const apiInput = document.getElementById("api");
+    const widthInput = document.getElementById("targetWidth");
+    const heightInput = document.getElementById("targetHeight");
+    const runBtn = document.getElementById("run");
+    const demoBtn = document.getElementById("demoBtn");
+    const inputPreview = document.getElementById("inputPreview");
+    const outputPreview = document.getElementById("outputPreview");
+    const inputMeta = document.getElementById("inputMeta");
+    const outputMeta = document.getElementById("outputMeta");
+    const statusBox = document.getElementById("status");
+    const demoModal = document.getElementById("demoModal");
+    const modalClose = document.getElementById("modalClose");
+    const userModal = document.getElementById("userModal");
+    const userModalClose = document.getElementById("userModalClose");
+    const userForm = document.getElementById("userForm");
+    const userName = document.getElementById("userName");
+    const userOrg = document.getElementById("userOrg");
+    const userEmail = document.getElementById("userEmail");
+    const userPurpose = document.getElementById("userPurpose");
+    const termsModal = document.getElementById("termsModal");
+    const termsAgree = document.getElementById("termsAgree");
+    const termsAgreeBtn = document.getElementById("termsAgreeBtn");
+
+    let currentFile = null;
+
+    const hasAgreedToTerms = localStorage.getItem("termsAgreed") === "true";
+    if (!hasAgreedToTerms) {
+      termsModal.classList.add("show");
+      document.body.style.overflow = "hidden";
+    }
+
+    termsAgree.addEventListener("change", () => {
+      termsAgreeBtn.disabled = !termsAgree.checked;
+    });
+
+    termsAgreeBtn.addEventListener("click", () => {
+      if (termsAgree.checked) {
+        localStorage.setItem("termsAgreed", "true");
+        termsModal.classList.remove("show");
+        document.body.style.overflow = "";
+      }
+    });
+
+    function showStatus(message, type = "") {
+      statusBox.textContent = message;
+      statusBox.className = "status show " + type;
+    }
+
+    function clearStatus() {
+      statusBox.className = "status";
+      statusBox.textContent = "";
+    }
+
+    function previewFile(file) {
+      const url = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      img.src = url;
+      img.onload = () => {
+        inputMeta.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+        widthInput.value = img.naturalWidth;
+        heightInput.value = img.naturalHeight;
+      };
+      inputPreview.innerHTML = "";
+      inputPreview.appendChild(img);
+    }
+
+    fileInput.addEventListener("change", () => {
+      currentFile = fileInput.files[0];
+      outputPreview.textContent = "Generated result will appear here.";
+      outputMeta.textContent = "PGVMS";
+      clearStatus();
+
+      if (!currentFile) return;
+      previewFile(currentFile);
+    });
+
+    async function runInference() {
+      if (!currentFile) {
+        showStatus("Please upload an H&E image first.", "err"); // 请先上传一张 H&E 图像。
+        return;
+      }
+
+      const endpoint = apiInput.value.trim() || "/api/infer";
+      const form = new FormData();
+      form.append("file", currentFile);
+      
+      const ukValue = localStorage.getItem('uk') || getCookie('uk') || "";
+      if (ukValue==""){
+        showStatus("Please enter your name, company, email, and application purpose information first.", "err"); // 请先录入姓名、单位、邮箱和应用目的信息。
+        return;
+      }
+      form.append("uk", ukValue);
+      
+      form.append("stain", stainInput.value);
+      form.append("target_width", widthInput.value || "");
+      form.append("target_height", heightInput.value || "");
+
+      runBtn.disabled = true;
+      runBtn.textContent = "Generating...";
+      outputPreview.textContent = "Model inference is running...";
+      showStatus("The backend PGVMS inference interface is being called."); // 正在调用后端 PGVMS 推理接口。
+
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          body: form
+        });
+
+        let data = null;
+        const contentType = resp.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          data = await resp.json();
+        }
+
+        if (!resp.ok) {
+          throw new Error((data && (data.detail || data.error)) || `HTTP ${resp.status}`);
+        }
+
+        let resultSrc = null;
+
+        if (data && data.result_png_base64) {
+          resultSrc = `${data.result_png_base64}`;
+        } else if (data && data.image_base64) {
+          resultSrc = `data:image/png;base64,${data.image_base64}`;
+        } else if (data && data.result_url) {
+          resultSrc = data.result_url;
+        } else if (data && data.url) {
+          resultSrc = data.url;
+        }
+
+        if (!resultSrc) {
+          throw new Error("The backend returned an incorrect format: it should be in the format of result_png_base64, image_base64, result_url, or url."); // 后端返回格式不对：需要 result_png_base64 / image_base64 / result_url / url。
+        }
+
+        const img = document.createElement("img");
+        img.src = resultSrc;
+        outputPreview.innerHTML = "";
+        outputPreview.appendChild(img);
+        outputMeta.textContent = `${stainInput.value} · ${widthInput.value || "-"}×${heightInput.value || "-"}`;
+        showStatus("Generation completed.", "ok"); // 生成完成。
+
+      } catch (err) {
+        outputPreview.textContent = "Generation failed."; // 生成失败。
+        showStatus(err.message, "err");
+      } finally {
+        runBtn.disabled = false;
+        runBtn.textContent = "Generate virtual IHC";
+      }
+    }
+
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    }
+
+    function setCookie(name, value, days = 365) {
+      const date = new Date();
+      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+      const expires = `expires=${date.toUTCString()}`;
+      document.cookie = `${name}=${value}; ${expires}; path=/`;
+    }
+
+    runBtn.addEventListener("click", () => {
+      if (!currentFile) {
+        showStatus("Please upload an H&E image first.", "err"); // 请先上传一张 H&E 图像。
+        return;
+      }
+      
+      const savedUk = localStorage.getItem('uk') || getCookie('uk');
+      if (savedUk) {
+        runInference();
+      } else {
+        userModal.classList.add("show");
+        document.body.style.overflow = "hidden";
+      }
+    });
+
+    userModalClose.addEventListener("click", () => {
+      userModal.classList.remove("show");
+      document.body.style.overflow = "";
+    });
+
+    userModal.addEventListener("click", (e) => {
+      if (e.target === userModal) {
+        userModal.classList.remove("show");
+        document.body.style.overflow = "";
+      }
+    });
+
+    userForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      
+      let isValid = true;
+      
+      document.getElementById('nameError').classList.remove('show');
+      document.getElementById('orgError').classList.remove('show');
+      document.getElementById('emailError').classList.remove('show');
+      document.getElementById('purposeError').classList.remove('show');
+
+      if (!userName.value.trim()) {
+        document.getElementById('nameError').classList.add('show');
+        isValid = false;
+      }
+      
+      if (!userOrg.value.trim()) {
+        document.getElementById('orgError').classList.add('show');
+        isValid = false;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!userEmail.value.trim() || !emailRegex.test(userEmail.value)) {
+        document.getElementById('emailError').classList.add('show');
+        isValid = false;
+      }
+      
+      if (!userPurpose.value.trim()) {
+        document.getElementById('purposeError').classList.add('show');
+        isValid = false;
+      }
+
+      if (isValid) {
+        const ukData = JSON.stringify({
+          name: userName.value.trim(),
+          organization: userOrg.value.trim(),
+          email: userEmail.value.trim(),
+          purpose: userPurpose.value.trim()
+        });
+
+        localStorage.setItem('uk', ukData);
+        setCookie('uk', ukData);
+
+        userModal.classList.remove("show");
+        document.body.style.overflow = "";
+        runInference();
+      }
+    });
+
+    demoBtn.addEventListener("click", () => {
+      demoModal.classList.add("show");
+      document.body.style.overflow = "hidden";
+    });
+
+    modalClose.addEventListener("click", () => {
+      demoModal.classList.remove("show");
+      document.body.style.overflow = "";
+    });
+
+    demoModal.addEventListener("click", (e) => {
+      if (e.target === demoModal) {
+        demoModal.classList.remove("show");
+        document.body.style.overflow = "";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -61,7 +61,7 @@ class Launcher(TmuxLauncher):
         opts = self.common_options()
         phase = 'val'
         for opt in opts:
-            opt.set(crop_size=1024, num_test=4000)
+            opt.set(crop_size=256,load_size=256, num_test=4000)
             opt.remove('n_epochs', 'n_epochs_decay', 'update_html_freq',
                        'save_epoch_freq', 'continue_train', 'epoch_count')
         return ["python test.py " + str(opt.set(phase=phase)) for opt in opts]

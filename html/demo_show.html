@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>PGVMS Virtual Staining Demo</title>
+    <style>
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        margin: 0;
+        padding: 32px;
+        background: linear-gradient(135deg, #f7f2ea, #fff7ed);
+        min-height: 100vh;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      h1 {
+        text-align: center;
+        color: #8b1e3f;
+        margin: 0 0 32px;
+        font-size: 32px;
+        letter-spacing: -0.05em;
+      }
+      .stain-section {
+        margin-bottom: 36px;
+        background: white;
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 8px 30px rgba(17,24,39,.08);
+      }
+      .stain-title {
+        margin: 0 0 20px;
+        color: #1f2937;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .image-row {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .image-box {
+        text-align: center;
+        width: 375px;
+        flex-shrink: 0;
+      }
+      .image-box img {
+        width: 100%;
+        height: 400px;
+        object-fit: contain;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.1);
+        background: #f5f5f5;
+      }
+      .image-label {
+        margin-top: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #6b7280;
+      }
+      .image-label.input {
+        color: #047857;
+      }
+      .image-label.output {
+        color: #8b1e3f;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 40px;
+        color: #9ca3af;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- PR Staining -->
+      <div class="stain-section">
+        <h2 class="stain-title">PR (Progesterone Receptor)</h2>
+        <div class="image-row">
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/input_ER.png" alt="PR Input">
+            <div class="image-label input">Input (H&E)</div>
+          </div>
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/output_ER.png" alt="PR Output">
+            <div class="image-label output">Output (Virtual IHC)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ki67 Staining -->
+      <div class="stain-section">
+        <h2 class="stain-title">Ki67 (Cell Proliferation)</h2>
+        <div class="image-row">
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/input_Ki67.png" alt="Ki67 Input">
+            <div class="image-label input">Input (H&E)</div>
+          </div>
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/output_Ki67.png" alt="Ki67 Output">
+            <div class="image-label output">Output (Virtual IHC)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HER2 Staining -->
+      <div class="stain-section">
+        <h2 class="stain-title">HER2 (Human Epidermal Growth Factor)</h2>
+        <div class="image-row">
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/input_HER2.png" alt="HER2 Input">
+            <div class="image-label input">Input (H&E)</div>
+          </div>
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/output_HER2.png" alt="HER2 Output">
+            <div class="image-label output">Output (Virtual IHC)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ER Staining -->
+      <div class="stain-section">
+        <h2 class="stain-title">ER (Estrogen Receptor)</h2>
+        <div class="image-row">
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/input_ER.png" alt="ER Input">
+            <div class="image-label input">Input (H&E)</div>
+          </div>
+          <div class="image-box">
+            <img src="http://pgvms.qin-mixlab.cn/demo_imgs/output_ER.png" alt="ER Output">
+            <div class="image-label output">Output (Virtual IHC)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        PGVMS - Prompt-Guided Virtual Multiplex IHC Staining
+      </div>
+    </div>
+  </body>
+</html>

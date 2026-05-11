@@ -1,0 +1,29 @@
+[Unit]
+Description=PGVMS API Service (Root Conda)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/vdb/pgvms/code/PGVMS
+
+# --- 核心配置：直接调用上面的脚本 ---
+# ExecStart=/vdb/pgvms/code/PGVMS/start_service.sh
+
+# 2. 建议使用绝对路径调用 python (替换为你 conda 环境的 python 路径)
+# 这样比调用 start_service.sh 更稳定
+ExecStart=/vdb/miniconda3/envs/PSPStain/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8026
+
+# --- 守护进程配置 ---
+Restart=always
+RestartSec=5
+SyslogIdentifier=pgvms
+
+# --- 日志配置 ---
+# 将标准输出和错误输出记录到 journal，方便用 journalctl 查看
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
