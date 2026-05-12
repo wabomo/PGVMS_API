@@ -17,9 +17,19 @@ import hashlib
 import asyncio
 import threading
 import queue
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+
+# 邮箱验证码存储 (内存缓存，有效期5分钟)
+email_verification_codes = {}
+
+# --- 加载环境变量配置 ---
+from dotenv import load_dotenv
+import os
+load_dotenv()  # 加载 .env 文件中的配置
 
 # --- 导入原项目依赖 ---
-from options.test_options import TestOptions
 from data import create_dataset
 from models import create_model
 import util.util as util
@@ -37,8 +47,12 @@ def init_database():
     # 创建 user 表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user (
-            id TEXT PRIMARY KEY,
-            uk_json TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_code TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
+            name TEXT NOT NULL,
+            organization TEXT NOT NULL,
+            purpose TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -47,12 +61,12 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
+            user_code TEXT NOT NULL,
             fp_a TEXT NOT NULL,
             result_path TEXT,
             state INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user(id)
+            FOREIGN KEY (user_code) REFERENCES user(user_code)
         )
     ''')
     
@@ -63,31 +77,43 @@ def init_database():
 def md5_hash(s: str) -> str:
     return hashlib.md5(s.encode('utf-8')).hexdigest()
 
-# 保存用户信息到数据库
-def save_user(uk_json: str) -> str:
-    user_id = md5_hash(uk_json)
+# 保存用户信息到数据库：仅当 user_code 不存在时插入
+def save_user_if_not_exists(user_code: str, email: str, name: str, organization: str, purpose: str) -> bool:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        cursor.execute('INSERT OR IGNORE INTO user (id, uk_json) VALUES (?, ?)', (user_id, uk_json))
+        # 第一步：先查询 user_code 是否已经存在
+        cursor.execute('SELECT 1 FROM user WHERE user_code = ?', (user_code,))
+        exists = cursor.fetchone() is not None
+
+        if exists:
+            # 已存在 → 不插入
+            return True  # 或根据你需求返回 False
+
+        # 第二步：不存在 → 执行插入
+        cursor.execute(
+            'INSERT INTO user (user_code, email, name, organization, purpose) VALUES (?, ?, ?, ?, ?)',
+            (user_code, email, name, organization, purpose)
+        )
         conn.commit()
+        return True
+
     except Exception as e:
         logger.error(f"保存用户信息失败: {e}")
+        return False
     finally:
         conn.close()
-    
-    return user_id
 
 # 保存数据记录到数据库
-def save_data(user_id: str, fp_a: str, result_path: str = None, state: int = 0) -> int:
+def save_data(user_code: str, fp_a: str, result_path: str = None, state: int = 0) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
         cursor.execute(
-            'INSERT INTO data (user_id, fp_a, result_path, state) VALUES (?, ?, ?, ?)',
-            (user_id, str(fp_a), str(result_path) if result_path else None, state)
+            'INSERT INTO data (user_code, fp_a, result_path, state) VALUES (?, ?, ?, ?)',
+            (user_code, str(fp_a), str(result_path) if result_path else '', state)
         )
         data_id = cursor.lastrowid
         conn.commit()
@@ -109,8 +135,10 @@ def update_data_state(data_id: int, state: int, result_path: str = None):
         else:
             cursor.execute('UPDATE data SET state = ? WHERE id = ?', (state, data_id))
         conn.commit()
+        return True
     except Exception as e:
         logger.error(f"更新数据状态失败: {e}")
+        return False
     finally:
         conn.close()
 
@@ -191,8 +219,6 @@ def algorithm_worker():
         logger.info("🤖 [Worker] 正在初始化模型...")   
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         opt, _ = parser.parse_known_args()    
-        # parser = TestOptions().get_parser()
-        # opt = parser.parse_args(args=[])  # ✅ 空参数，不读命令行     
 
         opt.lambda_GAN=1.0  # weight for GAN loss：GAN(G(X))
         opt.lambda_NCE=1.0  # weight for NCE loss: NCE(G(X), X)
@@ -346,19 +372,30 @@ async def startup_event():
 logger.info(f"✅ 模型 [{MODEL_NAME}] 加载成功！服务即将启动...")
 
 @app.post("/api/infer")
-async def infer_image(uk:str=Form(...),stain:str=Form(...),file: UploadFile = File(...),target_width:int=Form(0),target_height:int=Form(0)):
-    # 1. 计算 uk JSON 字符串的 MD5 值作为 user_id
-    user_id = md5_hash(uk)
-    
+async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_width:int=Form(0),target_height:int=Form(0),
+    uk:str=Form(""),email:str=Form(""),name:str=Form(""),organization:str=Form(""),purpose:str=Form("")):
+    # 1. 计算 email 的 MD5 值作为 user_code
+    if uk=="":
+        if email:
+            user_code = md5_hash(email)
+        else:
+            raise HTTPException(status_code=400, detail="The email value cannot be empty")
+        if name=="":
+            raise HTTPException(status_code=400, detail="The name value cannot be empty")
+        if organization=="":
+            raise HTTPException(status_code=400, detail="The organization value cannot be empty")
+        if purpose=="":
+            raise HTTPException(status_code=400, detail="The purpose value cannot be empty")
+    else:
+        user_code = uk
     # 2. 保存用户信息到数据库
-    save_user(uk)
-    
-    # 3. 生成唯一文件名并保存上传文件（使用 MD5 值作为 uk 部分）
+    save_user_if_not_exists(user_code,email,name,organization,purpose)    
+    # 3. 生成唯一文件名并保存上传文件（包含user_code）
     file_ext = Path(file.filename).suffix
     current_time_str = datetime.now().strftime("%Y%m%d-%H%M%S")
-    unique_id = f"{user_id}_{current_time_str}"
-    filename = f"{user_id}_{current_time_str}_{file.filename}_{stain}{file_ext}"
-    result_filename = f"{user_id}_{current_time_str}_{file.filename}_{stain}.png"
+    unique_id = f"{user_code}_{current_time_str}"
+    filename = f"{user_code}_{current_time_str}_{file.filename}_{stain}{file_ext}"
+    result_filename = f"{user_code}_{current_time_str}_{file.filename}_{stain}.png"
     fp_a= UPLOAD_DIR_A / filename
     fp_b = UPLOAD_DIR_B / filename
     
@@ -372,7 +409,7 @@ async def infer_image(uk:str=Form(...),stain:str=Form(...),file: UploadFile = Fi
         result_path = RESULTS_DIR / result_filename
         
         # 4. 保存数据记录到数据库（state=0 表示处理中）
-        data_id = save_data(user_id, str(fp_a), str(result_path), 0)
+        data_id = save_data(user_code, str(fp_a), str(result_path), 0)
         
         # 5. 发送消息给队列 A（包含 data_id 以便更新状态）
         task_info = {"id": unique_id, "one_pair_fp": one_pair_fp, "result_fp": str(result_path), "data_id": data_id}   
@@ -386,7 +423,7 @@ async def infer_image(uk:str=Form(...),stain:str=Form(...),file: UploadFile = Fi
         while True:
             # 检查是否超时
             if time.time() - start_time > POLL_TIMEOUT:
-                raise HTTPException(status_code=504, detail="处理超时，请稍后重试")
+                raise HTTPException(status_code=504, detail="Handling timeout, please try again later")
 
             # 检查结果文件是否存在
             if result_path.exists():
@@ -412,7 +449,96 @@ async def infer_image(uk:str=Form(...),stain:str=Form(...),file: UploadFile = Fi
     except Exception as e:
         logger.info(f"❌ 推理错误: {e}")
         # 如果出错，可以选择删除刚才保存的临时文件
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal exception: {str(e)}")
+
+# ==================================================
+# 邮箱验证码相关接口
+# ==================================================
+
+def send_email(to_email: str, code: str):
+    """发送邮箱验证码"""
+    try:
+        # 从环境变量读取邮箱配置
+        smtp_server = os.getenv('EMAIL_SMTP_SERVER', 'mail.cstnet.cn')
+        smtp_port = int(os.getenv('EMAIL_SMTP_PORT', '465'))
+        sender_email = os.getenv('EMAIL_SENDER', 'mixlab@siat.ac.cn')
+        sender_password = os.getenv('EMAIL_PASSWORD', '')
+        
+        # 检查密码是否已配置
+        if not sender_password:
+            logger.error("邮箱密码未配置，请在.env文件中设置EMAIL_PASSWORD")
+            return False
+       
+        # 邮件内容
+        message = MIMEText(f'Your PGVMS verification code is: {code}\n\nThe verification code is valid for 5 minutes. Please use it promptly.', 'plain', 'utf-8')
+        message['From']  = Header("PGVMS Virtual Staining <mixlab@siat.ac.cn>", 'utf-8')
+        message['To'] = Header(to_email)
+        message['Subject'] = Header('PGVMS verification code', 'utf-8')
+        
+        # ===================== 正确连接方式 =====================
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, [to_email], message.as_string())            
+        logger.info(f"✅ 邮件发送成功！{code} ==> {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"发送邮件失败: {e}")
+        return False
+
+def generate_verification_code() -> str:
+    """生成6位数字验证码"""
+    import random
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+@app.post("/api/send-verification-code")
+async def send_verification_code(email: str):
+    """发送邮箱验证码"""
+    # 验证邮箱格式
+    import re
+    if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+        return JSONResponse({"status": "error", "message": "Invalid email format"}, status_code=400)
+    
+    # # 检查是否是学术邮箱，前端检查就够了，后端不检查
+    # if not ('.edu' in email.lower() or '.ac' in email.lower()):
+    #     return JSONResponse({"status": "error", "message": "Please use an academic email"}, status_code=400)
+    
+    # 生成验证码
+    code = generate_verification_code()
+    
+    # 保存验证码（有效期5分钟）
+    email_verification_codes[email] = {
+        'code': code,
+        'timestamp': time.time()
+    }
+    
+    # 发送邮件
+    if send_email(email, code):
+        return JSONResponse({"status": "success", "message": "Verification code sent successfully"})
+    else:
+        # 发送失败时删除验证码记录
+        del email_verification_codes[email]
+        return JSONResponse({"status": "error", "message": "Failed to send verification code"}, status_code=500)
+
+@app.post("/api/verify-code")
+async def verify_code(email: str, code: str):
+    """验证邮箱验证码"""
+    # 检查验证码是否存在
+    if email not in email_verification_codes:
+        return JSONResponse({"status": "error", "message": "Verification code not found or expired"}, status_code=400)
+    
+    # 检查验证码是否过期（5分钟）
+    record = email_verification_codes[email]
+    if time.time() - record['timestamp'] > 300:
+        del email_verification_codes[email]
+        return JSONResponse({"status": "error", "message": "Verification code expired"}, status_code=400)
+    
+    # 检查验证码是否正确
+    if record['code'] != code:
+        return JSONResponse({"status": "error", "message": "Invalid verification code"}, status_code=400)
+    
+    # 验证成功，删除验证码记录
+    del email_verification_codes[email]
+    return JSONResponse({"status": "success", "message": "Verification successful"})
 
 if __name__ == "__main__":
     import uvicorn
