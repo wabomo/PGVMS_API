@@ -261,6 +261,46 @@
       font-weight: 700;
     }
 
+    .input-hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .file-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 14px;
+      padding-left: 16px;
+      padding-bottom: 5px;
+    }
+
+    .file-custom-btn {
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(139,30,63,.2);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .file-custom-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(139,30,63,.25);
+    }
+
+    .file-name {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
     .hint {
       margin-top: 14px;
       color: var(--muted);
@@ -688,7 +728,12 @@
         </block>
 
         <label for="file">1. Upload H&E image</label>
-        <input id="file" type="file" accept="image/*" />
+        <div class="file-input-wrapper">
+          <input id="file" type="file" accept="image/*" hidden />
+          <label for="file" class="file-custom-btn">Choose File</label>
+          <span id="fileName" class="file-name">No file chosen</span>
+        </div>
+        <div class="input-hint">Supported formats: JPG, PNG, TIF</div>
 
         <label for="stain">2. Target stain</label>
         <select id="stain">
@@ -758,6 +803,8 @@
                 F. Chen et al., "
                 <a href="https://ieeexplore.ieee.org/document/11393451" target="_blank">PGVMS: A Prompt-Guided Unified Framework for Virtual Multiplex IHC Staining with Pathological Semantic Learning</a>", in IEEE Transactions on Medical Imaging, doi: 10.1109/TMI.2026.3663755.
                 <!-- F. Chen et al., "<a href="https://doi.org/10.1109/TMI.2026.3663755" target="_blank">PGVMS: A Prompt-Guided Unified Framework for Virtual Multiplex IHC Staining with Pathological Semantic Learning</a>", in IEEE Transactions on Medical Imaging, doi: 10.1109/TMI.2026.3663755. -->
+                <br><br>
+                Chen F, Zhang R, Zheng B, et al. <a href="https://link.springer.com/chapter/10.1007/978-3-031-72083-3_36" target="_blank">Pathological semantics-preserving learning for H&E-to-IHC virtual staining</a>[C]//International Conference on Medical Image Computing and Computer-Assisted Intervention. Cham: Springer Nature Switzerland, 2024: 384-394.
               </p>
             <!-- </span> -->
           </div>
@@ -849,9 +896,9 @@
               <div class="form-error" id="orgError">Organization is required</div>
             </div>
             <div class="form-group">
-              <label>Email<span class="required">*</span></label>
-              <input type="email" id="userEmail" placeholder="Please enter your email">
-              <div class="form-error" id="emailError">Please use an academic email</div>
+              <label>Academic Email<span class="required">*</span><span class="hint">(including the suffix 'ac' or 'edu', e.g., xxx@xxx.edu, xxx@xxx.edu.xx, xxx@xxx.ac.xx)</span></label>
+              <input type="email" id="userEmail" placeholder="Please enter your academic email">
+              <div class="form-error" id="emailError">Please enter your academic email address (including the suffix 'ac' or 'edu')</div>
             </div>
             <div class="form-group">
               <label>Verification Code<span class="required">*</span></label>
@@ -942,6 +989,14 @@
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
         link.download = `VIHC_${stain}_${timestamp}.png`;
         link.click();
+        if (window.currentDataId) {
+          const formData = new FormData();
+          formData.append('data_id', window.currentDataId);
+          fetch('/api/update-download-status', {
+            method: 'POST',
+            body: formData
+          }).catch(err => console.error('Failed to update download status:', err));
+        }
       }
     }
 
@@ -968,6 +1023,13 @@
       outputPreview.textContent = "Generated result will appear here.";
       outputMeta.textContent = "PGVMS";
       clearStatus();
+
+      const fileNameSpan = document.getElementById("fileName");
+      if (fileInput.files.length > 0) {
+        fileNameSpan.textContent = fileInput.files[0].name;
+      } else {
+        fileNameSpan.textContent = "No file chosen";
+      }
 
       if (!currentFile) return;
       previewFile(currentFile);
@@ -1046,6 +1108,9 @@
         outputPreview.appendChild(img);
         outputMeta.textContent = `${stainInput.value} · ${widthInput.value || "-"}×${heightInput.value || "-"}`;
         showStatus("Generation completed.", "ok", true); // 生成完成, 显示下载按钮。
+        if (data && data.data_id) {
+          window.currentDataId = data.data_id;
+        }
         // 在生成结果图片后，删除localStorage中的pgvms-user-data信息
         const userDataValue = localStorage.getItem('pgvms-user-data') || "";
         if (userDataValue) {  

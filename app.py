@@ -53,9 +53,11 @@ def init_database():
             name TEXT NOT NULL,
             organization TEXT NOT NULL,
             purpose TEXT NOT NULL,
+            usage_cnt INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
     
     # 创建 data 表
     cursor.execute('''
@@ -65,10 +67,12 @@ def init_database():
             fp_a TEXT NOT NULL,
             result_path TEXT,
             state INTEGER DEFAULT 0,
+            flag_download INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_code) REFERENCES user(user_code)
         )
     ''')
+
     
     conn.commit()
     conn.close()
@@ -102,6 +106,49 @@ def save_user_if_not_exists(user_code: str, email: str, name: str, organization:
     except Exception as e:
         logger.error(f"保存用户信息失败: {e}")
         return False
+    finally:
+        conn.close()
+
+# 检查用户使用次数
+def check_usage_count(user_code: str) -> tuple:
+    """
+    检查用户使用次数是否超过限制（不更新计数）
+    返回: (is_allowed, current_count, max_count)
+    """
+    max_usage = int(os.getenv('MAX_USAGE_COUNT', '20'))
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('SELECT usage_cnt FROM user WHERE user_code = ?', (user_code,))
+        result = cursor.fetchone()
+        
+        if result is None:
+            return (True, 0, max_usage)
+        
+        current_count = result[0] if result[0] else 0
+        
+        if current_count >= max_usage:
+            return (False, current_count, max_usage)
+        
+        return (True, current_count, max_usage)
+    except Exception as e:
+        logger.error(f"检查使用次数失败: {e}")
+        return (True, 0, max_usage)
+    finally:
+        conn.close()
+
+# 增加用户使用次数
+def increment_usage_count(user_code: str):
+    """增加用户使用次数"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('UPDATE user SET usage_cnt = usage_cnt + 1 WHERE user_code = ?', (user_code,))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"增加使用次数失败: {e}")
     finally:
         conn.close()
 
@@ -390,7 +437,11 @@ async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_wi
         user_code = uk
     # 2. 保存用户信息到数据库
     save_user_if_not_exists(user_code,email,name,organization,purpose)    
-    # 3. 生成唯一文件名并保存上传文件（包含user_code）
+    # 3. 检查使用次数
+    is_allowed, current_count, max_count = check_usage_count(user_code)
+    if not is_allowed:
+        raise HTTPException(status_code=403, detail=f"You have exceeded the maximum usage limit of {max_count} times. Please contact us at mixlab@siat.ac.cn for collaboration.")
+    # 4. 生成唯一文件名并保存上传文件（包含user_code）
     file_ext = Path(file.filename).suffix
     current_time_str = datetime.now().strftime("%Y%m%d-%H%M%S")
     unique_id = f"{user_code}_{current_time_str}"
@@ -430,6 +481,9 @@ async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_wi
                 # 稍微等待一小会儿确保文件写入完成
                 time.sleep(0.05) 
                 
+                # 增加用户使用次数
+                increment_usage_count(user_code)
+                
                 # # 读取结果并转 Base64
                 # with open(result_path, "rb") as res_file:
                 #     img_data = res_file.read()
@@ -438,6 +492,7 @@ async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_wi
                 return JSONResponse({
                     "status": "success",
                     "task_id": unique_id,
+                    "data_id": data_id,
                     "result_url": "/"+str(result_path)
                     # "result_png_base64": f"data:image/png;base64,{img_base64}"
                 })
@@ -539,6 +594,63 @@ async def verify_code(email: str, code: str):
     # 验证成功，删除验证码记录
     del email_verification_codes[email]
     return JSONResponse({"status": "success", "message": "Verification successful"})
+
+@app.get("/api/query-all")
+async def query_all_data(fr: str = ""):
+    """查询所有用户和数据记录"""
+    if fr != "wabomo":
+        raise HTTPException(status_code=500, detail="Unauthorized access")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # 查询所有用户
+        cursor.execute('SELECT * FROM user ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        
+        # 获取列名
+        user_columns = [description[0] for description in cursor.description] if users else []
+
+        # 查询所有数据记录
+        cursor.execute('SELECT * FROM data ORDER BY created_at DESC')
+        data_records = cursor.fetchall()
+        
+        # 获取列名
+        data_columns = [description[0] for description in cursor.description] if data_records else []
+        
+        return JSONResponse({
+            "status": "success",
+            "users": {
+                "columns": user_columns,
+                "rows": users
+            },
+            "data_records": {
+                "columns": data_columns,
+                "rows": data_records
+            }
+        })
+    except Exception as e:
+        logger.error(f"查询数据失败: {e}")
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/update-download-status")
+async def update_download_status(data_id: int = Form(...)):
+    """更新数据的下载状态为已下载"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('UPDATE data SET flag_download = 1 WHERE id = ?', (data_id,))
+        conn.commit()
+        return JSONResponse({"status": "success", "message": "Download status updated"})
+    except Exception as e:
+        logger.error(f"更新下载状态失败: {e}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     import uvicorn
