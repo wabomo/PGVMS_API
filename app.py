@@ -339,6 +339,7 @@ def algorithm_worker():
         opt.phase = 'val' # 确保阶段正确       
         opt.pool_size = 0 
         opt.num_test = 100
+        opt.save_model_hw = True
         opt.isTrain = False
         opt.eval = False
         # set gpu ids
@@ -378,14 +379,16 @@ def algorithm_worker():
             result_fp = task_data['result_fp']
             try:
                 logger.info(f"⚙️ [Worker] 正在处理任务: {task_id} | 源文件: {one_pair_fp} | 预期结果: {result_fp}")
+                
                 dataset = create_dataset(opt, one_pair_fp=one_pair_fp)
                 for i,data in enumerate(dataset):
+                    save_wh = util.resolve_save_wh(opt, data, one_pair_fp[0])
                     model.set_input(data)
                     model.test()           # run inference
                     visuals = model.get_current_visuals()  # get image results
                     output_tensor_img_data = visuals.get('fake_B', None) 
                     im = util.tensor2im(output_tensor_img_data)
-                    util.save_image(im, result_fp)
+                    util.save_image(im, result_fp, save_size=save_wh)
                     logger.info(f"✨ [Worker] 任务 {task_id} 完成，结果存于: {result_fp}")
                     # 更新数据库状态为成功
                     if 'data_id' in task_data:
@@ -404,6 +407,7 @@ def algorithm_worker():
             continue
         except Exception as e:
             logger.info(f"💥 [Worker] 发生未知错误: {e}")
+
 
 # ==================================================
 # 2. FastAPI 接口：接收与轮询

@@ -72,6 +72,10 @@ class AlignedDataset(BaseDataset):
         A_img = Image.open(A_path).convert('RGB')
         B_img = Image.open(B_path).convert('RGB')
 
+        # 磁盘原始尺寸 [H, W]（与 tensor / numpy 的维度顺序一致），供 test 保存时缩放回输入图原始大小
+        A_hw = torch.tensor([A_img.size[1], A_img.size[0]], dtype=torch.long)
+        B_hw = torch.tensor([B_img.size[1], B_img.size[0]], dtype=torch.long)
+
         is_finetuning = self.opt.isTrain and self.current_epoch > self.opt.n_epochs
         modified_opt = util.copyconf(self.opt, load_size=self.opt.crop_size if is_finetuning else self.opt.load_size)
         transform_A = get_transform(modified_opt,colorjitter=True)
@@ -94,7 +98,8 @@ class AlignedDataset(BaseDataset):
         A_label_0 = A_path.split('_')[-1].split('.')[0]
         A_label = self.labellist.index(A_label_0)
 
-        return {'A': A, 'B': B,'A_label': A_label, 'A_paths': A_path, 'B_paths': B_path}
+        # return {'A': A, 'B': B,'A_label': A_label, 'A_paths': A_path, 'B_paths': B_path}
+        return {'A': A, 'B': B, 'A_label': A_label, 'A_paths': A_path, 'B_paths': B_path, 'A_hw': A_hw, 'B_hw': B_hw}
 
     def __len__(self):
         """Return the total number of images in the dataset.

@@ -81,13 +81,34 @@ def diagnose_network(net, name='network'):
     print(name)
     print(mean)
 
+def resolve_save_wh(opt, data_batch, image_paths):
+    """返回保存用的 PIL (width, height)，与磁盘上输入域原始图像一致；未知则 None。"""
+    if not opt.save_model_hw:
+        return None
 
-def save_image(image_numpy, image_path, aspect_ratio=1.0):
+    key = 'A_hw' if opt.direction == 'AtoB' else 'B_hw'
+
+    if key in data_batch:
+        t = data_batch[key]
+        if hasattr(t, 'dim') and t.dim() == 2:
+            t = t[0]
+        h, w = int(t[0]), int(t[1])
+        return (w, h)
+
+    if image_paths:
+        w, h = Image.open(image_paths[0]).size
+        return (w, h)
+
+    return None
+
+def save_image(image_numpy, image_path, aspect_ratio=1.0, save_size=None):
     """Save a numpy image to the disk
 
     Parameters:
         image_numpy (numpy array) -- input numpy array
         image_path (str)          -- the path of the image
+        aspect_ratio (float)      -- the aspect ratio of the image
+        save_size (list)          -- the size of the image to save, default is None
     """
 
     image_pil = Image.fromarray(image_numpy)
@@ -99,6 +120,10 @@ def save_image(image_numpy, image_path, aspect_ratio=1.0):
         image_pil = image_pil.resize((h, int(w * aspect_ratio)), Image.BICUBIC)
     elif aspect_ratio < 1.0:
         image_pil = image_pil.resize((int(h / aspect_ratio), w), Image.BICUBIC)
+    if save_size is not None:
+        sw, sh = int(save_size[0]), int(save_size[1])
+        if sw > 0 and sh > 0 and (image_pil.size[0] != sw or image_pil.size[1] != sh):
+            image_pil = image_pil.resize((sw, sh), Image.BICUBIC)
     image_pil.save(image_path)
 
 

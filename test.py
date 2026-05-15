@@ -67,5 +67,6 @@ if __name__ == '__main__':
         if i % 5 == 0:  # save images to an HTML file
             print('processing (%04d)-th image... %s' % (i, img_path))
         # print(img_path)
-        save_images(webpage, visuals, img_path, width=opt.display_winsize)
+        save_wh = resolve_save_wh(opt, data, img_path)
+        save_images(webpage, visuals, img_path, width=opt.display_winsize, save_size=save_wh)
     webpage.save()  # save the HTML
