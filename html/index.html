@@ -896,9 +896,9 @@
               <div class="form-error" id="orgError">Organization is required</div>
             </div>
             <div class="form-group">
-              <label>Academic Email<span class="required">*</span><span class="hint">(including the suffix 'ac' or 'edu', e.g., xxx@xxx.edu, xxx@xxx.edu.xx, xxx@xxx.ac.xx)</span></label>
+              <label>Academic Email<span class="required">*</span><span class="hint">(including the suffix 'ac','edu', or 'org', e.g., xxx@xxx.edu, xxx@xxx.edu.xx, xxx@xxx.ac.xx, xxx@xxx.org, xxx@xxx.org.xx)</span></label>
               <input type="email" id="userEmail" placeholder="Please enter your academic email">
-              <div class="form-error" id="emailError">Please enter your academic email address (including the suffix 'ac' or 'edu')</div>
+              <div class="form-error" id="emailError">Please enter your academic email address (including the suffix 'ac','edu', or 'org')</spandiv>
             </div>
             <div class="form-group">
               <label>Verification Code<span class="required">*</span></label>
@@ -1013,6 +1013,20 @@
         inputMeta.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
         widthInput.value = img.naturalWidth;
         heightInput.value = img.naturalHeight;
+        
+        const maxSize = 2040;
+        if (img.naturalWidth > maxSize || img.naturalHeight > maxSize) {
+          showStatus(`Image dimensions exceed ${maxSize}x${maxSize} pixels. Please resize your image and try again.`, "err");
+          runBtn.disabled = true;
+          currentFile = null;
+          fileInput.value = "";
+          const fileNameSpan = document.getElementById("fileName");
+          if (fileNameSpan) fileNameSpan.textContent = "No file chosen";
+          inputPreview.innerHTML = "";
+          return;
+        } else {
+          runBtn.disabled = false;
+        }
       };
       inputPreview.innerHTML = "";
       inputPreview.appendChild(img);
@@ -1032,6 +1046,19 @@
       }
 
       if (!currentFile) return;
+      
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.tif', '.tiff'];
+      const fileName = currentFile.name.toLowerCase();
+      const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+      
+      if (!validExtensions.includes(fileExtension)) {
+        showStatus("Unsupported file format. Only JPG, PNG, and TIF formats are supported.", "err");
+        fileInput.value = "";
+        currentFile = null;
+        fileNameSpan.textContent = "No file chosen";
+        return;
+      }
+      
       previewFile(currentFile);
     });
 
@@ -1311,6 +1338,9 @@
 
       // 2. 学术域名规则（已修复 siat.ac.cn）
       const academicRules = [
+        // 组织
+        /\.org$/,
+        /\.org\.[a-z]{2}$/,    // 如 .org.au .org.hk
         // 国外高校
         /\.edu$/,
         /\.edu\.[a-z]{2}$/,    // 如 .edu.au .edu.hk

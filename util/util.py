@@ -9,7 +9,8 @@ import argparse
 from argparse import Namespace
 import torchvision
 import cv2 as cv
-
+import time
+import psutil
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -126,6 +127,48 @@ def save_image(image_numpy, image_path, aspect_ratio=1.0, save_size=None):
             image_pil = image_pil.resize((sw, sh), Image.BICUBIC)
     image_pil.save(image_path)
 
+
+
+def is_file_write_finished(file_path, wait_sec=1, check_times=3):
+    """
+    判断大文件是否已经完成写入（图片/大文件专用）
+    :param file_path: 文件路径
+    :param wait_sec: 每次检查间隔
+    :param check_times: 连续检查几次大小不变
+    :return: True=写入完成; False=文件不存在或正在写入
+    """
+    # 1. 文件不存在
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        # 2. 检查文件是否被其他进程占用（正在写入）
+        for proc in psutil.process_iter(['pid', 'name', 'open_files']):
+            try:
+                if proc.open_files():
+                    for f in proc.open_files():
+                        if file_path == f.path:
+                            # 被占用 = 正在写入
+                            return False
+            except:
+                continue
+
+        # 3. 连续检查文件大小是否稳定不变
+        last_size = -1
+        for _ in range(check_times):
+            current_size = os.path.getsize(file_path)
+            if current_size != last_size:
+                last_size = current_size
+                time.sleep(wait_sec)
+            else:
+                # 大小连续几次不变 → 写入完成
+                return True
+
+        return True
+
+    except Exception as e:
+        # 文件被占用、无法获取大小 → 正在写入
+        return False
 
 def print_numpy(x, val=True, shp=False):
     """Print the mean, min, max, median, std, and size of a numpy array

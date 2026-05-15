@@ -12,6 +12,8 @@ from pathlib import Path
 import argparse
 import sqlite3
 import hashlib
+import torch
+import gc
 
 # 需要引入 asyncio 用于异步睡眠
 import asyncio
@@ -199,7 +201,7 @@ RESULTS_DIR = Path("./results")  # 算法结果保存目录
 CHECKPOINT_DIR = "./checkpoints"     # 模型存放目录
 MODEL_NAME = "PGVMS"  # 你的模型文件夹名 (例如: horse2zebra_pretrained)
 POLL_INTERVAL = 0.1  # 轮询间隔，单位： 秒
-POLL_TIMEOUT = 20  # 轮询超时时间，单位： 秒
+POLL_TIMEOUT = 100  # 轮询超时时间，单位： 秒
 LOG_DIR = Path("./logs") # 日志目录
 # =============================================
 
@@ -312,10 +314,10 @@ def algorithm_worker():
         opt.serial_batches=False #'if true, takes images in order to make batches, otherwise takes them randomly')
         opt.num_threads=2 # threads for loading data')
         opt.batch_size=1 #'input batch size')
-        opt.load_size=512 #'scale images to this size')
-        opt.crop_size=512 #'then crop to this size')
+        opt.load_size=256 #'scale images to this size')
+        opt.crop_size=256 #'then crop to this size')
         opt.max_dataset_size=float("inf") #'Maximum number of samples allowed per dataset. If the dataset directory contains more than max_dataset_size, only a subset is loaded.')
-        opt.preprocess='resize_and_crop' #'scaling and cropping of images at load time [resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
+        opt.preprocess='none' #'scaling and cropping of images at load time [resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
         opt.no_flip=True #'if specified, do not flip the images for data augmentation')
         opt.display_winsize=256 #'display window size for both visdom and HTML')
         opt.random_scale_max=3.0 #(used for single image translation) Randomly scale the image by the specified factor as data augmentation.')
@@ -382,23 +384,28 @@ def algorithm_worker():
                 
                 dataset = create_dataset(opt, one_pair_fp=one_pair_fp)
                 for i,data in enumerate(dataset):
-                    save_wh = util.resolve_save_wh(opt, data, one_pair_fp[0])
                     model.set_input(data)
                     model.test()           # run inference
                     visuals = model.get_current_visuals()  # get image results
                     output_tensor_img_data = visuals.get('fake_B', None) 
                     im = util.tensor2im(output_tensor_img_data)
+                    save_wh = util.resolve_save_wh(opt, data, one_pair_fp)
+                    logger.info(f"save_wh: {save_wh},im_size: {(im.shape[1], im.shape[0])}")
                     util.save_image(im, result_fp, save_size=save_wh)
                     logger.info(f"✨ [Worker] 任务 {task_id} 完成，结果存于: {result_fp}")
                     # 更新数据库状态为成功
                     if 'data_id' in task_data:
                         update_data_state(task_data['data_id'], 1, result_fp)
+                    # 清空 GPU 内存
+                    clear_gpu_memory()                    
                     break
             except Exception as e:
                 logger.info(f"❌ [Worker] 任务 {task_id} 处理失败: {e}")
                 # 更新数据库状态为失败
                 if 'data_id' in task_data:
                     update_data_state(task_data['data_id'], 2)
+                # 清空 GPU 内存
+                clear_gpu_memory()
             
             # 标记任务完成 (虽然这里没用到 task_done，但在队列操作中是好习惯)
             task_queue.task_done()
@@ -407,6 +414,20 @@ def algorithm_worker():
             continue
         except Exception as e:
             logger.info(f"💥 [Worker] 发生未知错误: {e}")
+
+def clear_gpu_memory():
+    """
+    清空 GPU 内存
+    """
+    # 删除所有临时变量
+    del data, visuals, output_tensor_img_data, im
+    gc.collect()
+
+    # 清空 CUDA 显存（核心）
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
 
 
 # ==================================================
@@ -474,14 +495,13 @@ async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_wi
         # 3. 轮询结果目录 (每隔 100ms 检查一次)
         # 设置一个超时时间防止无限等待 (例如 60秒)
         start_time = time.time()
-        
         while True:
             # 检查是否超时
             if time.time() - start_time > POLL_TIMEOUT:
                 raise HTTPException(status_code=504, detail="Handling timeout, please try again later")
 
             # 检查结果文件是否存在
-            if result_path.exists():
+            if util.is_file_write_finished(result_path, wait_sec=0.5, check_times=3):                
                 # 稍微等待一小会儿确保文件写入完成
                 time.sleep(0.05) 
                 
@@ -508,7 +528,7 @@ async def infer_image(stain:str=Form(...),file: UploadFile = File(...),target_wi
     except Exception as e:
         logger.info(f"❌ 推理错误: {e}")
         # 如果出错，可以选择删除刚才保存的临时文件
-        raise HTTPException(status_code=500, detail=f"Internal exception: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Internal exception: {str(e)}")
 
 # ==================================================
 # 邮箱验证码相关接口

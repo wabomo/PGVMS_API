@@ -3,3 +3,5 @@ checkpoints/
 pretrain/
 models/style_vgg.pth
 test copy.py
+tst_email.py
+split_output/
