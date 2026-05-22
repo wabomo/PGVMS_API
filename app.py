@@ -629,30 +629,20 @@ async def query_all_data(fr: str = ""):
     cursor = conn.cursor()
     
     try:
-        # 查询所有用户
-        cursor.execute('SELECT * FROM user ORDER BY created_at DESC')
-        users = cursor.fetchall()
-        
-        # 获取列名
-        user_columns = [description[0] for description in cursor.description] if users else []
+        cursor.execute('SELECT * FROM user ORDER BY usage_cnt DESC')
+        users_raw = cursor.fetchall()
+        user_columns = [description[0] for description in cursor.description] if users_raw else []
+        users = [dict(zip(user_columns, row)) for row in users_raw]
 
-        # 查询所有数据记录
         cursor.execute('SELECT * FROM data ORDER BY created_at DESC')
-        data_records = cursor.fetchall()
-        
-        # 获取列名
-        data_columns = [description[0] for description in cursor.description] if data_records else []
+        data_raw = cursor.fetchall()
+        data_columns = [description[0] for description in cursor.description] if data_raw else []
+        data_records = [dict(zip(data_columns, row)) for row in data_raw]
         
         return JSONResponse({
             "status": "success",
-            "users": {
-                "columns": user_columns,
-                "rows": users
-            },
-            "data_records": {
-                "columns": data_columns,
-                "rows": data_records
-            }
+            "users": users,
+            "data_records": data_records
         })
     except Exception as e:
         logger.error(f"查询数据失败: {e}")
@@ -660,6 +650,25 @@ async def query_all_data(fr: str = ""):
     finally:
         conn.close()
 
+@app.post("/api/tmp-exec-sql")
+async def tmp_exec_sql(fr: str = Form(""),sql: str = Form(...)):
+    """查询所有用户和数据记录"""
+    if fr != "wabomo":
+        raise HTTPException(status_code=500, detail="Unauthorized access")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(sql)
+        conn.commit()
+        return JSONResponse({"status": "success", "message": "SQL executed successfully"})
+    except Exception as e:
+        logger.error(f"执行SQL语句失败: {e}")
+        raise HTTPException(status_code=500, detail=f"Execution failed: {str(e)}")
+    finally:
+        conn.close()
+        
 @app.post("/api/update-download-status")
 async def update_download_status(data_id: int = Form(...)):
     """更新数据的下载状态为已下载"""
