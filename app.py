@@ -174,7 +174,7 @@ def save_data(user_code: str, fp_a: str, result_path: str = None, state: int = 0
         conn.close()
 
 # 更新数据记录状态
-def update_data_state(data_id: int, state: int, result_path: str = None):
+def update_data_state(data_id: int, state: int, result_path: str = None, old_state: int = 0):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -182,7 +182,7 @@ def update_data_state(data_id: int, state: int, result_path: str = None):
         if result_path:
             cursor.execute('UPDATE data SET state = ?, result_path = ? WHERE id = ?', (state, str(result_path), data_id))
         else:
-            cursor.execute('UPDATE data SET state = ? WHERE id = ?', (state, data_id))
+            cursor.execute('UPDATE data SET state = ? WHERE id = ? and state = ?', (state, data_id, old_state))
         conn.commit()
         return True
     except Exception as e:
@@ -396,14 +396,16 @@ def algorithm_worker():
                     # 更新数据库状态为成功
                     if 'data_id' in task_data:
                         update_data_state(task_data['data_id'], 1, result_fp)
+                    # 删除所有临时变量
+                    del data, visuals, output_tensor_img_data, im
                     # 清空 GPU 内存
                     clear_gpu_memory()                    
                     break
             except Exception as e:
-                logger.info(f"❌ [Worker] 任务 {task_id} 处理失败: {e}")
+                logger.info(f"❌ [Worker] 任务 {task_id} 处理失败: {traceback.format_exc()}")
                 # 更新数据库状态为失败
                 if 'data_id' in task_data:
-                    update_data_state(task_data['data_id'], 2)
+                    update_data_state(task_data['data_id'], 2, old_state=0)
                 # 清空 GPU 内存
                 clear_gpu_memory()
             
@@ -419,8 +421,6 @@ def clear_gpu_memory():
     """
     清空 GPU 内存
     """
-    # 删除所有临时变量
-    del data, visuals, output_tensor_img_data, im
     gc.collect()
 
     # 清空 CUDA 显存（核心）
